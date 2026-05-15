@@ -92,7 +92,7 @@ async def detect_face(file: UploadFile = File(...)):
         attention_status = "No Face"
 
     # MediaPipe eye tracking
-    if results.multi_face_landmarks:
+    if results.multi_face_landmarks  and len(faces) > 0:
 
         for face_landmarks in results.multi_face_landmarks:
             # Nose landmark
@@ -148,14 +148,34 @@ async def detect_face(file: UploadFile = File(...)):
             else:
                      drowsy_counter = 0
             
+            # if eye_distance < 0.015 and not looking_away:
+            #     # if drowsy_counter > 2:
+            #         is_drowsy = True
+            #         attention_status = "Drowsy"
+
+            # else:
+            #         is_drowsy = False
+            #         attention_status = "Focused"
+            # if len(faces) == 0:
+            #         is_drowsy = False
+            #         attention_status = "No Driver"
+
+
+            # No valid driver detected
+        if len(faces) == 0:
+            is_drowsy = False
+            attention_status = "No Driver"
+
+        # Driver visible → run drowsiness logic
+        else:
+
             if eye_distance < 0.015 and not looking_away:
-                if drowsy_counter > 4:
-                    is_drowsy = True
-                    attention_status = "Drowsy"
+                is_drowsy = True
+                attention_status = "Drowsy"
 
             else:
-                    is_drowsy = False
-                    attention_status = "Focused"
+                is_drowsy = False
+                attention_status = "Focused"
 
             if attention_status == "Focused":
                 attention_score = 96
