@@ -17,6 +17,9 @@ class DriverTelemetry(BaseModel):
 
     attentionScore: int
 
+    blinkRate: int
+    gazeStability: int
+
 class VisionTelemetry(BaseModel):
 
     trackingState: str

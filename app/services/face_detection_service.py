@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import mediapipe as mp
 import math
+import time
 
 from app.models.telemetry_models import (
 
@@ -15,6 +16,8 @@ from app.models.telemetry_models import (
 
     TelemetryResponse,
 )
+
+from app.services.event_service import generate_events
 
 # OpenCV Face Detection
 face_cascade = cv2.CascadeClassifier(
@@ -32,6 +35,12 @@ face_mesh = mp_face_mesh.FaceMesh(
 
 drowsy_counter = 0
 looking_away_counter = 0
+blink_counter = 0
+
+blink_detected = False
+
+blink_start_time = time.time()
+gaze_history = []
 
 # Distance helper
 def calculate_distance(point1, point2):
@@ -41,7 +50,8 @@ def calculate_distance(point1, point2):
     )
 
 def process_driver_frame(contents):
-
+    
+    start_time = time.perf_counter()
     # Convert image
     np_array = np.frombuffer(contents, np.uint8)
 
@@ -66,6 +76,10 @@ def process_driver_frame(contents):
 
     global drowsy_counter
     global looking_away_counter
+    global blink_counter
+    global blink_detected
+    global blink_start_time
+    global gaze_history
 
     # OpenCV face detection
     faces = face_cascade.detectMultiScale(
@@ -113,7 +127,13 @@ def process_driver_frame(contents):
                 looking_away_counter = 0
 
             # Confirm only after few frames
-            looking_away = looking_away_counter > 3
+            gaze_history.append(
+                head_direction
+            )
+
+            if len(gaze_history) > 20:
+                 gaze_history.pop(0)
+                 looking_away = looking_away_counter > 3
             if looking_away:
                 attention_status = "Distracted"
 
@@ -128,12 +148,14 @@ def process_driver_frame(contents):
             )
 
             # Threshold for closed eye
-
-            
             if eye_distance < 0.015 and not looking_away:
                     drowsy_counter += 1
+            if not blink_detected:
+                    blink_counter += 1
+                    blink_detected = True
             else:
-                     drowsy_counter = 0
+                    drowsy_counter = 0
+                    blink_detected = False
             
             # if eye_distance < 0.015 and not looking_away:
             #     # if drowsy_counter > 2:
@@ -176,10 +198,59 @@ def process_driver_frame(contents):
             else:
                 attention_score = 0
 
+    processing_time = (
+    time.perf_counter() - start_time
+    )
 
+    latency = int(
+    processing_time * 1000
+    )
+
+    fps = (
+    int(1 / processing_time)
+    if processing_time > 0
+    else 0
+    )
+
+    elapsed_minutes = (
+    time.time() - blink_start_time
+            ) / 60
+
+    blink_rate = (
+    int(blink_counter / elapsed_minutes)
+    if elapsed_minutes > 0
+    else 0
+    )
+
+    center_count = gaze_history.count(
+    "Center"
+    )
+
+    gaze_stability = (
+        int(
+            (center_count / len(gaze_history))
+            * 100
+        )
+        if len(gaze_history) > 0
+        else 100
+    )
+    
+    events = generate_events(
+        attention_status=
+            attention_status,
+        is_drowsy=
+            is_drowsy,
+        looking_away=
+            looking_away,
+        face_detected=
+            face_detected,
+        gaze_stability=
+            gaze_stability,
+    )
+    
     return TelemetryResponse(
 
-    driver=DriverTelemetry(
+        driver=DriverTelemetry(
 
         faceDetected=face_detected,
 
@@ -194,6 +265,9 @@ def process_driver_frame(contents):
         lookingAway=looking_away,
 
         attentionScore=attention_score,
+
+        blinkRate=blink_rate,
+        gazeStability=gaze_stability,
     ),
 
     vision=VisionTelemetry(
@@ -206,14 +280,18 @@ def process_driver_frame(contents):
         meshEnabled=True,
 
         meshConfidence=
-            round(attention_score / 100, 2),
+            round(0.95
+        if face_detected
+        else 0.0,2),
+
+           
 
         pipelineStatus=
             "Operational",
 
-        fps=18,
+        fps=fps,
 
-        latency=142,
+        latency=latency,
     ),
 
     vehicle=VehicleTelemetry(
@@ -243,25 +321,9 @@ def process_driver_frame(contents):
             else "Active",
     ),
 
-    events=[
-
-        AIEvent(
-
-            type=attention_status,
-
-            severity=
-
-                "critical"
-                if is_drowsy
-
-                else "warning"
-                if looking_away
-
-                else "info",
-        )
-
-    ],
+    events=events,
 )
+    
     # return {
     #     "faceDetected": face_detected,
         
