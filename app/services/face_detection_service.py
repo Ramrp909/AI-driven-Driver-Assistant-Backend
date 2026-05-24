@@ -1,20 +1,19 @@
-from fastapi import FastAPI, File, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-
 import cv2
 import numpy as np
 import mediapipe as mp
 import math
 
-app = FastAPI()
+from app.models.telemetry_models import (
 
-# Enable CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    DriverTelemetry,
+
+    VisionTelemetry,
+
+    VehicleTelemetry,
+
+    AIEvent,
+
+    TelemetryResponse,
 )
 
 # OpenCV Face Detection
@@ -41,19 +40,7 @@ def calculate_distance(point1, point2):
         (point1.y - point2.y) ** 2
     )
 
-# Home route
-@app.get("/")
-def home():
-    return {
-        "message": "Smart Vehicle AI Backend Running"
-    }
-
-# Face + Drowsiness Detection
-@app.post("/detect-face")
-async def detect_face(file: UploadFile = File(...)):
-
-    # Read uploaded image
-    contents = await file.read()
+def process_driver_frame(contents):
 
     # Convert image
     np_array = np.frombuffer(contents, np.uint8)
@@ -190,16 +177,100 @@ async def detect_face(file: UploadFile = File(...)):
                 attention_score = 0
 
 
+    return TelemetryResponse(
 
-    return {
-        "faceDetected": face_detected,
+    driver=DriverTelemetry(
+
+        faceDetected=face_detected,
+
+        faceCount=len(faces),
+
+        isDrowsy=is_drowsy,
+
+        attentionStatus=attention_status,
+
+        headDirection=head_direction,
+
+        lookingAway=looking_away,
+
+        attentionScore=attention_score,
+    ),
+
+    vision=VisionTelemetry(
+
+        trackingState=
+            "Locked"
+            if face_detected
+            else "Lost",
+
+        meshEnabled=True,
+
+        meshConfidence=
+            round(attention_score / 100, 2),
+
+        pipelineStatus=
+            "Operational",
+
+        fps=18,
+
+        latency=142,
+    ),
+
+    vehicle=VehicleTelemetry(
+
+        riskLevel=
+
+            "Critical"
+            if is_drowsy
+
+            else "Warning"
+            if looking_away
+
+            else "Low",
+
+        safetyMode=
+
+            "Protection"
+            if is_drowsy
+
+            else "Monitoring",
+
+        assistState=
+
+            "Intervention"
+            if is_drowsy
+
+            else "Active",
+    ),
+
+    events=[
+
+        AIEvent(
+
+            type=attention_status,
+
+            severity=
+
+                "critical"
+                if is_drowsy
+
+                else "warning"
+                if looking_away
+
+                else "info",
+        )
+
+    ],
+)
+    # return {
+    #     "faceDetected": face_detected,
         
-        "faceCount": len(faces),
-        "isDrowsy": is_drowsy,
-        "attentionStatus": attention_status,
+    #     "faceCount": len(faces),
+    #     "isDrowsy": is_drowsy,
+    #     "attentionStatus": attention_status,
 
-        "headDirection": head_direction,
-        "lookingAway": looking_away,
+    #     "headDirection": head_direction,
+    #     "lookingAway": looking_away,
 
-        "attentionScore": attention_score,
-    }
+    #     "attentionScore": attention_score,
+    # }
