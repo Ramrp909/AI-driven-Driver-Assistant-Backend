@@ -63,6 +63,22 @@ def generate_events(
                 severity="critical",
             )
         )
+        
+    if (
+        is_drowsy
+         and can_trigger_event(
+        "Emergency Intervention",
+        cooldown=20
+        )
+        ):
+        events.append(
+        AIEvent(
+            type=
+                "Emergency Intervention",
+            severity=
+                "critical",
+        )
+    )
 
     # Driver distracted
     if (
@@ -124,5 +140,6 @@ def generate_events(
                 severity="monitoring",
             )
         )
+    
 
     return events
