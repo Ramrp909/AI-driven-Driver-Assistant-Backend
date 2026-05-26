@@ -222,3 +222,17 @@ async def recognize_driver(
         "matched": False,
         "message": "Unknown driver"
     }
+    
+@app.delete("/clear-drivers")
+async def clear_drivers():
+
+    cursor.execute(
+        "DELETE FROM drivers"
+    )
+
+    conn.commit()
+
+    return {
+        "success": True,
+        "message": "All driver profiles cleared"
+    }
