@@ -8,6 +8,11 @@ class DriverTelemetry(BaseModel):
     faceCount: int
 
     isDrowsy: bool
+    isYawning: bool = False
+    isTalking: bool = False
+    fatigueLevel: str = "Low"
+    safetyScore: int = 100
+    phoneDetected: bool = False
 
     attentionStatus: str
 

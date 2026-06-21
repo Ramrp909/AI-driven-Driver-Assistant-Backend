@@ -17,6 +17,10 @@ from app.models.telemetry_models import (
     TelemetryResponse,
 )
 
+from app.services.phone_detection_service import (
+    detect_phone
+)
+
 from app.services.event_service import generate_events
 
 # OpenCV Face Detection
@@ -56,6 +60,7 @@ def process_driver_frame(contents):
     np_array = np.frombuffer(contents, np.uint8)
 
     image = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+    phone_detected = detect_phone(image)
 
     # OpenCV grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -68,6 +73,8 @@ def process_driver_frame(contents):
 
     # Default values
     is_drowsy = False
+    is_yawning = False
+    is_talking = False
     attention_status = "Focused"
 
     head_direction = "Center"
@@ -125,6 +132,26 @@ def process_driver_frame(contents):
                 looking_away_counter += 1
             else:
                 looking_away_counter = 0
+                
+                
+            #yawning
+            
+            upper_lip = face_landmarks.landmark[13]
+
+            lower_lip = face_landmarks.landmark[14]
+
+            mouth_distance = calculate_distance(
+                upper_lip,
+                lower_lip
+            )
+            print(
+                f"Mouth Distance = {mouth_distance:.5f}"
+            )
+            if mouth_distance > 0.05:
+                is_yawning = True
+                
+            if ( mouth_distance > 0.015 and mouth_distance < 0.05):
+                is_talking = True
 
             # Confirm only after few frames
             gaze_history.append(
@@ -235,11 +262,19 @@ def process_driver_frame(contents):
         else 100
     )
     
+   
+    
     events = generate_events(
         attention_status=
             attention_status,
         is_drowsy=
             is_drowsy,
+        is_yawning=
+            is_yawning,
+        is_talking = 
+            is_talking,
+        phone_detected =
+            phone_detected,
         looking_away=
             looking_away,
         face_detected=
@@ -247,6 +282,29 @@ def process_driver_frame(contents):
         gaze_stability=
             gaze_stability,
     )
+    
+    fatigue_level = "Low"
+    safety_score = 100
+    if is_drowsy:
+        fatigue_level = "High"
+    elif is_yawning:
+        fatigue_level = "Medium"
+    if is_drowsy:
+        safety_score -= 50
+    if is_yawning:
+        safety_score -= 20
+    if is_talking:
+        safety_score -= 10
+    if looking_away:
+        safety_score -= 25
+    if not face_detected:
+        safety_score -= 40
+    if phone_detected:
+        safety_score -= 35
+    safety_score = max(0,min(100, safety_score))
+    if phone_detected:
+        attention_status = "Phone Usage"
+    
     
     return TelemetryResponse(
 
@@ -257,6 +315,11 @@ def process_driver_frame(contents):
         faceCount=len(faces),
 
         isDrowsy=is_drowsy,
+        isYawning = is_yawning,
+        isTalking = is_talking,
+        fatigueLevel=fatigue_level,
+        safetyScore=safety_score,
+        phoneDetected=phone_detected,
 
         attentionStatus=attention_status,
 
@@ -268,6 +331,8 @@ def process_driver_frame(contents):
 
         blinkRate=blink_rate,
         gazeStability=gaze_stability,
+        
+
     ),
 
     vision=VisionTelemetry(
