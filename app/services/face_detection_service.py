@@ -47,6 +47,16 @@ blink_detected = False
 
 blink_start_time = time.time()
 gaze_history = []
+YAWNING_THRESHOLD = 0.05
+
+WARNING_1_SECONDS = 2
+WARNING_2_SECONDS = 4
+WARNING_3_SECONDS = 6
+
+TALKING_MIN_DISTANCE = 0.015
+TALKING_MAX_DISTANCE = 0.05
+
+DROWSY_EYE_THRESHOLD = 0.015
 
 # Distance helper
 def calculate_distance(point1, point2):
@@ -79,12 +89,14 @@ def process_driver_frame(contents):
     is_yawning = False
     is_talking = False
     attention_status = "Focused"
+    
 
     head_direction = "Center"
     looking_away = False
     attention_score = 100
     emergency_mode = False
     recommended_action = "Continue Driving"
+    
 
     global drowsy_counter
     global warning_counter
@@ -175,20 +187,37 @@ def process_driver_frame(contents):
                 lower_lip
             )
             
-            if mouth_distance > 0.05:
-                is_yawning = True
+            # if mouth_distance > 0.05:
+            #     is_yawning = True
                 
-            if ( mouth_distance > 0.015 and mouth_distance < 0.05):
-                is_talking = True
+            is_yawning = (
+    mouth_distance > YAWNING_THRESHOLD
+)
+                
+            # if ( mouth_distance > 0.015 and mouth_distance < 0.05):
+            #     is_talking = True
+            is_talking = (
+                TALKING_MIN_DISTANCE
+                < mouth_distance
+                < TALKING_MAX_DISTANCE
+            )
 
             # Confirm only after few frames
             gaze_history.append(
                 head_direction
             )
-            # print(
-            #     f"Mouth Distance = "
-            #     f"{mouth_distance:.5f}"
-            # )
+            
+            
+            if is_yawning:
+                print(
+                    f"YAWNING DETECTED: "
+                    f"{mouth_distance:.5f}"
+                )
+                
+            print(
+                f"Mouth Distance = "
+                f"{mouth_distance:.5f}"
+            )
 
             if len(gaze_history) > 20:
                  gaze_history.pop(0)
@@ -255,11 +284,22 @@ def process_driver_frame(contents):
                 drowsy_duration = 0
                 
                 
-            if drowsy_duration > 5:
+            # if drowsy_duration > 5:
+            #     warning_counter = 1
+            # if drowsy_duration > 10:
+            #     warning_counter = 2
+            # if drowsy_duration > 15:
+            #     warning_counter = 3
+                
+            warning_counter = 0
+
+            if drowsy_duration > WARNING_1_SECONDS:
                 warning_counter = 1
-            if drowsy_duration > 10:
+
+            if drowsy_duration > WARNING_2_SECONDS:
                 warning_counter = 2
-            if drowsy_duration > 15:
+
+            if drowsy_duration > WARNING_3_SECONDS:
                 warning_counter = 3
                 
            
@@ -329,8 +369,8 @@ def process_driver_frame(contents):
         fatigue_score += 30
     if is_drowsy:
         fatigue_score += 50
-    if head_direction == "Down":
-        fatigue_score += 20
+    # if head_direction == "Down":
+    #     fatigue_score += 20
     if fatigue_score >= 70:
         fatigue_level = "High"
     elif fatigue_score >= 30:
@@ -348,17 +388,33 @@ def process_driver_frame(contents):
         safety_score -= 25
     if not face_detected:
         safety_score -= 40
-    if phone_detected:
-        safety_score -= 35
-    safety_score = max(0,min(100, safety_score))
+        
+    # if phone_detected:
+    #     safety_score -= 35
+    # safety_score = max(0,min(100, safety_score))
+    # if phone_detected:
+    #     attention_status = "Phone Usage"
     if phone_detected:
         attention_status = "Phone Usage"
+    elif is_drowsy:
+        attention_status = "Drowsy"
+    elif looking_away:
+        attention_status = "Distracted"
+    else:
+        attention_status = "Focused"
         
-    emergency_mode = False
-    recommended_action = "Continue Driving"
-    if warning_counter >= 3:
-            emergency_mode = True
-            recommended_action = "Pull Over"
+    # emergency_mode = False
+    # recommended_action = "Continue Driving"
+    # if warning_counter >= 3:
+    #         emergency_mode = True
+    #         recommended_action = "Pull Over"
+    emergency_mode = (warning_counter >= 3 )
+
+    recommended_action = (
+            "Pull Over"
+            if emergency_mode
+            else "Continue Driving"
+    )
     
     events = generate_events(
         attention_status=
