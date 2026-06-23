@@ -23,14 +23,13 @@ BASE_DIR = os.path.dirname(
 DATASET_PATH = os.path.join(
     BASE_DIR,
     "dataset",
-    "drowsiness"
+    "lighting_conditions"
 )
 
 results = {}
 
 total = 0
 correct = 0
-
 
 for folder in os.listdir(DATASET_PATH):
 
@@ -68,40 +67,14 @@ for folder in os.listdir(DATASET_PATH):
             buffer.tobytes()
         )
 
-        passed = False
-
-        if folder == "eyes_open":
-
-            passed = (
-                result.driver.isDrowsy
-                == False
-            )
-
-        elif folder == "eyes_closed":
-
-            passed = (
-                result.driver.isDrowsy
-                == True
-            )
-
-        elif folder == "yawning":
-
-            passed = (
-                result.driver.isYawning
-                == True
-            )
-
-        elif folder == "fatigued":
-
-            passed = (
-                result.driver.fatigueLevel
-                in ["Medium", "High"]
-            )
+        detected = (
+            result.driver.faceDetected
+        )
 
         folder_total += 1
         total += 1
 
-        if passed:
+        if detected:
 
             folder_correct += 1
             correct += 1
@@ -111,8 +84,7 @@ for folder in os.listdir(DATASET_PATH):
         folder_total
     )
 
-
-print("\nDROWSINESS RESULTS\n")
+print("\nLIGHTING EVALUATION\n")
 
 for cls, (c, t) in results.items():
 
@@ -135,6 +107,6 @@ overall = (
 )
 
 print(
-    f"\nOverall Accuracy: "
+    f"\nOverall Face Detection Rate: "
     f"{overall:.2f}%"
 )

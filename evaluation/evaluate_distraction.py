@@ -1,152 +1,141 @@
 import os
-import requests
+import sys
+import cv2
+import numpy as np
 
-API_URL = "http://localhost:8000/detect-face"
+sys.path.append(
+    os.path.dirname(
+        os.path.dirname(
+            os.path.abspath(__file__)
+        )
+    )
+)
 
-DATASET_ROOT = "../dataset/distraction"
+from app.services.face_detection_service import (
+    process_driver_frame
+)
 
-results = {
-    "focused": {
-        "total": 0,
-        "correct": 0
-    },
-    "looking_away": {
-        "total": 0,
-        "correct": 0
-    },
-    "phone_usage": {
-        "total": 0,
-        "correct": 0
-    },
-    "talking": {
-        "total": 0,
-        "correct": 0
-    }
-}
+BASE_DIR = os.path.dirname(
+    os.path.dirname(
+        os.path.abspath(__file__)
+    )
+)
+
+DATASET_PATH = os.path.join(
+    BASE_DIR,
+    "dataset",
+    "distraction"
+)
+
+results = {}
+
+total = 0
+correct = 0
 
 
-def test_image(image_path):
+for folder in os.listdir(DATASET_PATH):
 
-    with open(image_path, "rb") as f:
+    folder_path = os.path.join(
+        DATASET_PATH,
+        folder
+    )
 
-        files = {
-            "file": f
-        }
+    if not os.path.isdir(folder_path):
+        continue
 
-        response = requests.post(
-            API_URL,
-            files=files
+    folder_total = 0
+    folder_correct = 0
+
+    for file in os.listdir(folder_path):
+
+        image_path = os.path.join(
+            folder_path,
+            file
         )
 
-        return response.json()
+        image = cv2.imread(
+            image_path
+        )
 
+        if image is None:
+            continue
 
-# Focused
-folder = os.path.join(
-    DATASET_ROOT,
-    "focused"
-)
+        _, buffer = cv2.imencode(
+            ".jpg",
+            image
+        )
 
-for file_name in os.listdir(folder):
+        result = process_driver_frame(
+            buffer.tobytes()
+        )
 
-    path = os.path.join(folder, file_name)
+        passed = False
 
-    response = test_image(path)
+        if folder == "focused":
 
-    results["focused"]["total"] += 1
+            passed = (
+                result.driver.lookingAway
+                == False
+            )
 
-    if response["driver"]["attentionStatus"] == "Focused":
+        elif folder == "looking_away":
 
-        results["focused"]["correct"] += 1
+            passed = (
+                result.driver.lookingAway
+                == True
+            )
 
+        elif folder == "phone_usage":
 
-# Looking Away
-folder = os.path.join(
-    DATASET_ROOT,
-    "looking_away"
-)
+            passed = (
+                result.driver.phoneDetected
+                == True
+            )
 
-for file_name in os.listdir(folder):
+        elif folder == "talking":
 
-    path = os.path.join(folder, file_name)
+            passed = (
+                result.driver.isTalking
+                == True
+            )
 
-    response = test_image(path)
+        folder_total += 1
+        total += 1
 
-    results["looking_away"]["total"] += 1
+        if passed:
 
-    if response["driver"]["lookingAway"]:
+            folder_correct += 1
+            correct += 1
 
-        results["looking_away"]["correct"] += 1
-
-
-# Phone Usage
-folder = os.path.join(
-    DATASET_ROOT,
-    "phone_usage"
-)
-
-for file_name in os.listdir(folder):
-
-    path = os.path.join(folder, file_name)
-
-    response = test_image(path)
-
-    results["phone_usage"]["total"] += 1
-
-    if response["driver"]["attentionStatus"] == "Distracted":
-
-        results["phone_usage"]["correct"] += 1
-
-
-# Talking
-folder = os.path.join(
-    DATASET_ROOT,
-    "talking"
-)
-
-for file_name in os.listdir(folder):
-
-    path = os.path.join(folder, file_name)
-
-    response = test_image(path)
-
-    results["talking"]["total"] += 1
-
-    if response["driver"]["attentionStatus"] == "Distracted":
-
-        results["talking"]["correct"] += 1
+    results[folder] = (
+        folder_correct,
+        folder_total
+    )
 
 
 print("\nDISTRACTION RESULTS\n")
 
-overall_total = 0
-overall_correct = 0
-
-for category in results:
-
-    total = results[category]["total"]
-
-    correct = results[category]["correct"]
-
-    overall_total += total
-    overall_correct += correct
+for cls, (c, t) in results.items():
 
     accuracy = (
-        correct / total
-    ) * 100
+        c / t * 100
+        if t > 0
+        else 0
+    )
 
     print(
-        f"{category}: "
-        f"{correct}/{total} "
+        f"{cls}: "
+        f"{c}/{t} "
         f"({accuracy:.2f}%)"
     )
 
-overall_accuracy = (
-    overall_correct /
-    overall_total
-) * 100
+overall = (
+    correct / total * 100
+    if total > 0
+    else 0
+)
 
 print(
     f"\nOverall Accuracy: "
-    f"{overall_accuracy:.2f}%"
+    f"{overall:.2f}%"
 )

@@ -185,6 +185,10 @@ def process_driver_frame(contents):
             gaze_history.append(
                 head_direction
             )
+            # print(
+            #     f"Mouth Distance = "
+            #     f"{mouth_distance:.5f}"
+            # )
 
             if len(gaze_history) > 20:
                  gaze_history.pop(0)

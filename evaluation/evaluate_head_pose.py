@@ -23,14 +23,13 @@ BASE_DIR = os.path.dirname(
 DATASET_PATH = os.path.join(
     BASE_DIR,
     "dataset",
-    "drowsiness"
+    "head_pose"
 )
 
 results = {}
 
 total = 0
 correct = 0
-
 
 for folder in os.listdir(DATASET_PATH):
 
@@ -68,40 +67,28 @@ for folder in os.listdir(DATASET_PATH):
             buffer.tobytes()
         )
 
-        passed = False
+        predicted = (
+            result.driver.headDirection
+        )
 
-        if folder == "eyes_open":
+        expected = None
 
-            passed = (
-                result.driver.isDrowsy
-                == False
-            )
+        if folder == "forward":
+            expected = "Center"
 
-        elif folder == "eyes_closed":
+        elif folder == "left":
+            expected = "Left"
 
-            passed = (
-                result.driver.isDrowsy
-                == True
-            )
+        elif folder == "right":
+            expected = "Right"
 
-        elif folder == "yawning":
-
-            passed = (
-                result.driver.isYawning
-                == True
-            )
-
-        elif folder == "fatigued":
-
-            passed = (
-                result.driver.fatigueLevel
-                in ["Medium", "High"]
-            )
+        if expected is None:
+            continue
 
         folder_total += 1
         total += 1
 
-        if passed:
+        if predicted == expected:
 
             folder_correct += 1
             correct += 1
@@ -111,8 +98,7 @@ for folder in os.listdir(DATASET_PATH):
         folder_total
     )
 
-
-print("\nDROWSINESS RESULTS\n")
+print("\nHEAD POSE RESULTS\n")
 
 for cls, (c, t) in results.items():
 
