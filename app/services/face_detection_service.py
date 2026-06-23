@@ -38,6 +38,8 @@ face_mesh = mp_face_mesh.FaceMesh(
 )
 
 drowsy_counter = 0
+warning_counter = 0
+drowsy_start_time = None
 looking_away_counter = 0
 blink_counter = 0
 
@@ -73,6 +75,7 @@ def process_driver_frame(contents):
 
     # Default values
     is_drowsy = False
+    drowsy_duration = 0
     is_yawning = False
     is_talking = False
     attention_status = "Focused"
@@ -80,8 +83,12 @@ def process_driver_frame(contents):
     head_direction = "Center"
     looking_away = False
     attention_score = 100
+    emergency_mode = False
+    recommended_action = "Continue Driving"
 
     global drowsy_counter
+    global warning_counter
+    global drowsy_start_time
     global looking_away_counter
     global blink_counter
     global blink_detected
@@ -109,21 +116,44 @@ def process_driver_frame(contents):
                 # Left and right face landmarks
             left_face = face_landmarks.landmark[234]
             right_face = face_landmarks.landmark[454]
+            left_eye = face_landmarks.landmark[33]
+            right_eye = face_landmarks.landmark[263]
+
+            eye_y = (left_eye.y + right_eye.y) / 2
+            
 
                 # Calculate face balance
             left_distance = abs(nose.x - left_face.x)
             right_distance = abs(right_face.x - nose.x)
 
                 # Head direction detection
-            if left_distance > right_distance + 0.03:
+            # if left_distance > right_distance + 0.03:
+            #     head_direction = "Right"
+            #     looking_away = True
+
+            # elif right_distance > left_distance + 0.03:
+            #     head_direction = "Left"
+            #     looking_away = True
+            
+            
+            # if nose.y > eye_y + 0.06:
+            #     head_direction = "Down"
+            #     looking_away = True
+            # elif left_distance > right_distance + 0.015:
+            #     head_direction = "Right"
+            #     looking_away = True
+            # elif right_distance > left_distance + 0.015:
+            #     head_direction = "Left"
+            #     looking_away = True
+            # else:
+            #     head_direction = "Center"
+            #     looking_away = False
+            if left_distance > right_distance + 0.015:
                 head_direction = "Right"
                 looking_away = True
-
-            elif right_distance > left_distance + 0.03:
+            elif right_distance > left_distance + 0.015:
                 head_direction = "Left"
                 looking_away = True
-                
-
             else:
                 head_direction = "Center"
                 looking_away = False
@@ -144,9 +174,7 @@ def process_driver_frame(contents):
                 upper_lip,
                 lower_lip
             )
-            print(
-                f"Mouth Distance = {mouth_distance:.5f}"
-            )
+            
             if mouth_distance > 0.05:
                 is_yawning = True
                 
@@ -208,11 +236,30 @@ def process_driver_frame(contents):
             if eye_distance < 0.015 and not looking_away:
                 is_drowsy = True
                 attention_status = "Drowsy"
-
             else:
                 is_drowsy = False
                 attention_status = "Focused"
-
+            if is_drowsy:
+                if drowsy_start_time is None:
+                    drowsy_start_time = time.time()
+                drowsy_duration = (
+                    time.time()
+                    - drowsy_start_time
+                )
+            else:
+                drowsy_start_time = None
+                drowsy_duration = 0
+                
+                
+            if drowsy_duration > 5:
+                warning_counter = 1
+            if drowsy_duration > 10:
+                warning_counter = 2
+            if drowsy_duration > 15:
+                warning_counter = 3
+                
+           
+    
             if attention_status == "Focused":
                 attention_score = 96
 
@@ -264,6 +311,51 @@ def process_driver_frame(contents):
     
    
     
+    
+    
+    fatigue_level = "Low"
+    safety_score = 100
+    # if is_drowsy:
+    #     fatigue_level = "High"
+    # elif is_yawning:
+    #     fatigue_level = "Medium"
+    
+    fatigue_score = 0
+    if is_yawning:
+        fatigue_score += 30
+    if is_drowsy:
+        fatigue_score += 50
+    if head_direction == "Down":
+        fatigue_score += 20
+    if fatigue_score >= 70:
+        fatigue_level = "High"
+    elif fatigue_score >= 30:
+        fatigue_level = "Medium"
+    else:
+        fatigue_level = "Low"
+    
+    if is_drowsy:
+        safety_score -= 50
+    if is_yawning:
+        safety_score -= 20
+    if is_talking:
+        safety_score -= 10
+    if looking_away:
+        safety_score -= 25
+    if not face_detected:
+        safety_score -= 40
+    if phone_detected:
+        safety_score -= 35
+    safety_score = max(0,min(100, safety_score))
+    if phone_detected:
+        attention_status = "Phone Usage"
+        
+    emergency_mode = False
+    recommended_action = "Continue Driving"
+    if warning_counter >= 3:
+            emergency_mode = True
+            recommended_action = "Pull Over"
+    
     events = generate_events(
         attention_status=
             attention_status,
@@ -281,29 +373,9 @@ def process_driver_frame(contents):
             face_detected,
         gaze_stability=
             gaze_stability,
+        emergency_mode = emergency_mode,
     )
-    
-    fatigue_level = "Low"
-    safety_score = 100
-    if is_drowsy:
-        fatigue_level = "High"
-    elif is_yawning:
-        fatigue_level = "Medium"
-    if is_drowsy:
-        safety_score -= 50
-    if is_yawning:
-        safety_score -= 20
-    if is_talking:
-        safety_score -= 10
-    if looking_away:
-        safety_score -= 25
-    if not face_detected:
-        safety_score -= 40
-    if phone_detected:
-        safety_score -= 35
-    safety_score = max(0,min(100, safety_score))
-    if phone_detected:
-        attention_status = "Phone Usage"
+        
     
     
     return TelemetryResponse(
@@ -320,6 +392,10 @@ def process_driver_frame(contents):
         fatigueLevel=fatigue_level,
         safetyScore=safety_score,
         phoneDetected=phone_detected,
+        
+        warningCount=warning_counter,
+        emergencyMode=emergency_mode,
+        recommendedAction=recommended_action,
 
         attentionStatus=attention_status,
 

@@ -38,6 +38,7 @@ def generate_events(
     is_yawning,
     is_talking,
     phone_detected,
+    emergency_mode,
 
     looking_away,
 
@@ -158,6 +159,14 @@ def generate_events(
             severity="critical"
         )
     )
+        
+    if emergency_mode:
+        events.append(
+            AIEvent(
+                type="Emergency Intervention",
+                severity="critical"
+            )
+        )
 
     # Stable driving state
     if (
