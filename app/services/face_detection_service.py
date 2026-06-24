@@ -117,6 +117,8 @@ def process_driver_frame(contents):
     face_detected = len(faces) > 0
     if not face_detected:
         attention_status = "No Face"
+        warning_counter = 0
+        drowsy_start_time = None
 
     # MediaPipe eye tracking
     if results.multi_face_landmarks  and len(faces) > 0:
@@ -208,16 +210,7 @@ def process_driver_frame(contents):
             )
             
             
-            if is_yawning:
-                print(
-                    f"YAWNING DETECTED: "
-                    f"{mouth_distance:.5f}"
-                )
-                
-            print(
-                f"Mouth Distance = "
-                f"{mouth_distance:.5f}"
-            )
+           
 
             if len(gaze_history) > 20:
                  gaze_history.pop(0)
@@ -244,6 +237,7 @@ def process_driver_frame(contents):
             else:
                     drowsy_counter = 0
                     blink_detected = False
+            
             
             # if eye_distance < 0.015 and not looking_away:
             #     # if drowsy_counter > 2:
@@ -389,9 +383,9 @@ def process_driver_frame(contents):
     if not face_detected:
         safety_score -= 40
         
-    # if phone_detected:
-    #     safety_score -= 35
-    # safety_score = max(0,min(100, safety_score))
+    if phone_detected:
+        safety_score -= 35
+    safety_score = max(0,min(100, safety_score))
     # if phone_detected:
     #     attention_status = "Phone Usage"
     if phone_detected:
