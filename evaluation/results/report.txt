@@ -1,0 +1,38 @@
+AI DRIVER MONITORING SYSTEM
+==================================================
+
+FACE_RECOGNITION
+------------------------------
+ram: 100.0%
+saketh: 100.0%
+unknown_driver: 100.0%
+overall: 100.0%
+
+DROWSINESS
+------------------------------
+eyes_open: 100.0%
+eyes_closed: 100.0%
+fatigued: 38.89%
+yawning: 44.44%
+
+DISTRACTION
+------------------------------
+focused: 100.0%
+looking_away: 31.25%
+phone_usage: 82.61%
+talking: 100.0%
+
+HEAD_POSE
+------------------------------
+forward: 75.0%
+left: 95.0%
+right: 80.0%
+overall: 83.33%
+
+LIGHTING
+------------------------------
+daylight: 100.0%
+indoor: 100.0%
+low_light: 100.0%
+night: 100.0%
+overall: 100.0%

@@ -1,0 +1,5 @@
+Category,Accuracy (%)
+forward,75.0
+left,95.0
+right,80.0
+overall,83.33
